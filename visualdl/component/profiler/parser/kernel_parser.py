@@ -126,7 +126,7 @@ class KernelParser:
                                 device_node.end_ns - device_node.start_ns)
                             self.gpu_ids.add(device_node.device_id)
         self.occupancy = weighted_occupancy / total_duration if total_duration != 0 else 0.0
-        self.sm_efficiency = weighted_sm_efficiency / total_duration if total_duration != 0 else 0.0
+        self.sm_efficiency = weighted_sm_efficiency # to divide ProfileStep time in ProfileData
         total_count = 0
         total_tensorcore_count = 0
         for name, node in self.kernel_items.items():

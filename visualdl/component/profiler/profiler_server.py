@@ -54,6 +54,13 @@ class ProfilerApi(object):
     @result()
     def timeunits(self):
         return ['ns', 'us', 'ms', 's']
+    
+    @result()
+    def descriptions(self, lang):
+        if lang == 'undefined' or lang == None:
+            lang = 'ch'
+        lang = lang.lower()
+        return self._reader.get_descriptions(lang)
 
     @result()
     def overview_environment(self, run, worker, span):
@@ -113,7 +120,7 @@ class ProfilerApi(object):
         run_manager = self._reader.get_run_manager(run)
         profiler_data = run_manager.get_profile_data(worker, span)
         topk = int(topk)
-        return profiler_data.get_operator_pie(topk, 'GPUTotal', time_unit)
+        return profiler_data.get_operator_pie(topk, time_unit)
 
     @result()
     def operator_pie_expand(self, run, worker, span, topk, device_type,
@@ -296,6 +303,7 @@ def create_profiler_api_call(logdir):
         'workers': (api.workers, ["run", "view"]),
         'spans': (api.spans, ["run", "worker"]),
         'timeunits': (api.timeunits, []),
+        'descriptions': (api.descriptions, ["lang"]),
         'overview/environment': (api.overview_environment,
                                  ["run", "worker", "span"]),
         'overview/model_perspective': (api.model_perspective,

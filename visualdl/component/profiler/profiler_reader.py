@@ -25,6 +25,7 @@ from multiprocess import Queue
 from .parser.event_node import load_profiler_json
 from .run_manager import RunManager
 from visualdl.io import bfile
+from .parser.const_description import *
 
 _name_pattern = re.compile(r"(.+)_time_(.+)\.paddle_trace\.((pb)|(json))")
 
@@ -120,6 +121,24 @@ class ProfileReader(object):
                     continue
                 self._read_data(run, filename)
         return list(self.walks.keys())
+    
+    def get_descriptions(self, lang):
+        if lang == 'ch':
+            return {
+                "overview_environment":  TOOLTIP_DEVICE_INFO_CN,
+                "overview_model_perspective":  TOOLTIP_MODEL_PERSPECTIVE_CN,
+                "overview_model_perspective_perstep": TOOLTIP_MODEL_PERSPECTIVE_PERSTEP_CN,
+                "overview_event_type_perspective": TOOLTIP_EVENT_TYPE_PERSPECTIVE_CN,
+                "overview_event_type_model_perspective": TOOLTIP_EVENT_TYPE_MODEL_PERSPECTIVE_CN
+                }
+        else:
+            return {
+                "overview_environment":  TOOLTIP_DEVICE_INFO_EN,
+                "overview_model_perspective":  TOOLTIP_MODEL_PERSPECTIVE_EN,
+                "overview_model_perspective_perstep": TOOLTIP_MODEL_PERSPECTIVE_PERSTEP_EN,
+                "overview_event_type_perspective": TOOLTIP_EVENT_TYPE_PERSPECTIVE_EN,
+                "overview_event_type_model_perspective": TOOLTIP_EVENT_TYPE_MODEL_PERSPECTIVE_EN
+                }
 
     def set_displayname(self, log_reader):
         self.displayname2runs = log_reader.name2tags

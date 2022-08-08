@@ -170,7 +170,7 @@ class ProfileData:
                     "utilization":
                     format_ratio(self.gpu_ulitization),
                     "sm_efficiency":
-                    format_ratio(self.sm_efficiency),
+                    format_ratio(self.sm_efficiency/self.model_perspective_items['ProfileStep'].cpu_time),
                     "achieved_occupancy":
                     format_ratio(self.occupancy),
                     "tensor_core_percentage":
@@ -504,7 +504,7 @@ class ProfileData:
                 })
         return data
 
-    def get_operator_pie(self, topk, sorted_by='GPUTotal', time_unit='ms'):
+    def get_operator_pie(self, topk, time_unit='ms'):
         data = OrderedDict()
         data['column_name'] = [
             "name", "calls", "total_time", "avg_time", "max_time", "min_time",
@@ -513,61 +513,33 @@ class ProfileData:
         data['cpu'] = []
         if self.has_gpu:
             data['gpu'] = []
-        else:
-            sorted_by = 'CPUTotal'
-        if sorted_by == 'CPUTotal':
-            sorted_items = sorted(
-                self.operator_items.items(),
-                key=lambda x: x[1].cpu_time,
-                reverse=True)
-        elif sorted_by == 'CPUAvg':
-            sorted_items = sorted(
-                self.operator_items.items(),
-                key=lambda x: x[1].avg_cpu_time,
-                reverse=True)
-        elif sorted_by == 'CPUMax':
-            sorted_items = sorted(
-                self.operator_items.items(),
-                key=lambda x: x[1].max_cpu_time,
-                reverse=True)
-        elif sorted_by == 'CPUMin':
-            sorted_items = sorted(
-                self.operator_items.items(), key=lambda x: x[1].min_cpu_time)
-        elif sorted_by == 'GPUTotal':
-            sorted_items = sorted(
+            gpu_sorted_items = sorted(
                 self.operator_items.items(),
                 key=lambda x: x[1].general_gpu_time,
                 reverse=True)
-        elif sorted_by == 'GPUAvg':
-            sorted_items = sorted(
-                self.operator_items.items(),
-                key=lambda x: x[1].avg_general_gpu_time,
-                reverse=True)
-        elif sorted_by == 'GPUMax':
-            sorted_items = sorted(
-                self.operator_items.items(),
-                key=lambda x: x[1].max_general_gpu_time,
-                reverse=True)
-        elif sorted_by == 'GPUMin':
-            sorted_items = sorted(
-                self.operator_items.items(),
-                key=lambda x: x[1].min_general_gpu_time)
-        else:
-            sorted_items = sorted(
-                self.operator_items.items(),
-                key=lambda x: x[1].general_gpu_time,
-                reverse=True)
+        
+        cpu_sorted_items = sorted(
+            self.operator_items.items(),
+            key=lambda x: x[1].cpu_time,
+            reverse=True)
+       
         if topk <= 0:
-            items = sorted_items
+            cpu_items = cpu_sorted_items
+            if self.has_gpu:
+                gpu_items = gpu_sorted_items
         else:
-            items = sorted_items[:topk]
+            cpu_items = cpu_sorted_items[:topk]
+            if self.has_gpu:
+                gpu_items = gpu_sorted_items[:topk]
         total_cpu_time = 0.0
         total_gpu_time = 0.0
-        for op_name, item in items:
+        for op_name, item in cpu_items:
             total_cpu_time += item.cpu_time
-            total_gpu_time += item.general_gpu_time
+        if self.has_gpu:
+            for op_name, item in gpu_items:
+                total_gpu_time += item.general_gpu_time
 
-        for op_name, item in items:
+        for op_name, item in cpu_items:
             cpu_stage_data = OrderedDict()
             cpu_stage_data['name'] = op_name
             cpu_stage_data['calls'] = item.call
@@ -581,7 +553,9 @@ class ProfileData:
                                                      time_unit)
             cpu_stage_data['ratio'] = format_ratio(
                 item.cpu_time / total_cpu_time)
-            if self.has_gpu:
+            data['cpu'].append(cpu_stage_data)
+        if self.has_gpu:
+            for op_name, item in gpu_items:
                 gpu_stage_data = OrderedDict()
                 gpu_stage_data['name'] = op_name
                 gpu_stage_data['calls'] = item.call
@@ -595,8 +569,6 @@ class ProfileData:
                     item.min_general_gpu_time, time_unit)
                 gpu_stage_data['ratio'] = format_ratio(
                     item.general_gpu_time / total_gpu_time)
-            data['cpu'].append(cpu_stage_data)
-            if self.has_gpu:
                 data['gpu'].append(gpu_stage_data)
         return data
 
@@ -605,10 +577,17 @@ class ProfileData:
         data['order'] = []
         data['phase_type'] = []
         data['data'] = []
-        sorted_items = sorted(
+        if device_type == 'cpu':
+            sorted_items = sorted(
             self.operator_items.items(),
-            key=lambda x: x[1].general_gpu_time,
+            key=lambda x: x[1].cpu_time,
             reverse=True)
+        
+        else:
+            sorted_items = sorted(
+                self.operator_items.items(),
+                key=lambda x: x[1].general_gpu_time,
+                reverse=True)
         if topk <= 0 or topk >= 20:
             items = sorted_items[:20]
             other_items = sorted_items[20:]
