@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # =======================================================================
+import base64
+
 import numpy as np
 
 __all__ = [
@@ -182,3 +184,17 @@ def visualize_headpose(image, data):
 
     result = fd.vision.vis_headpose(image, headpose_result)
     return result
+
+
+def visualize_text_to_image(data):
+    '''
+    Visualize text to image model outputs.
+    '''
+    print("I am in visualization")
+    print('data', data, type(data))
+    try:
+        image = base64.b64decode(data.tobytes())
+    except Exception as e:
+        print(e)
+    print('image size', image.shape)
+    return image

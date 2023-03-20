@@ -50,12 +50,13 @@ from visualdl.utils.dir import FASTDEPLOYSERVER_PATH
 
 
 class FastDeployServerApi(object):
-    def __init__(self):
+    def __init__(self, args):
         self.root_dir = Path(os.getcwd())
         self.opened_servers = {
         }  # Use to store the opened server process pid and process itself
         self.client_port = None  # Chinese version
         self.client_en_port = None  # English version
+        self.args = args
 
     @result()
     def get_directory(self, cur_dir):
@@ -374,7 +375,7 @@ class FastDeployServerApi(object):
         if lang == 'en':
             if self.client_en_port is None:
                 self.client_en_port = get_free_tcp_port()
-                app = create_gradio_client_app_en()
+                app = create_gradio_client_app_en(self.args)
                 thread = Process(
                     target=app.launch,
                     kwargs={'server_port': self.client_en_port})
@@ -384,7 +385,7 @@ class FastDeployServerApi(object):
         else:
             if self.client_port is None:
                 self.client_port = get_free_tcp_port()
-                app = create_gradio_client_app()
+                app = create_gradio_client_app(self.args)
                 thread = Process(
                     target=app.launch,
                     kwargs={'server_port': self.client_port})
@@ -404,8 +405,8 @@ class FastDeployServerApi(object):
             del self.opened_servers[server_id]
 
 
-def create_fastdeploy_api_call():
-    api = FastDeployServerApi()
+def create_fastdeploy_api_call(args):
+    api = FastDeployServerApi(args)
     routes = {
         'get_directory': (api.get_directory, ['dir']),
         'config_update': (api.config_update,

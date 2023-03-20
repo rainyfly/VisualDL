@@ -278,6 +278,7 @@ class BosFileSystem(object):
         self._file_contents_to_add = b''
         self._file_contents_count = 0
         self._start_append_time = time.time()
+        self.bos_client = None
         if write_flag:
             self.get_bos_config()
             self.bos_client = BosClient(self.config)

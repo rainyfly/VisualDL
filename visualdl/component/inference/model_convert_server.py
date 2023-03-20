@@ -49,7 +49,7 @@ class ModelConvertApi(object):
         try:
             self.bos_client = BosFileSystem()
             self.bucket_name = os.getenv("BOS_BUCKET_NAME")
-        except Exception:
+        except Exception as e:
             # When BOS_HOST, BOS_AK, BOS_SK, BOS_STS are not set in the environment variables.
             # We use VDL BOS by default
             self.bos_client = BosFileSystem(write_flag=False)
