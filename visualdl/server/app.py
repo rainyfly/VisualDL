@@ -87,7 +87,7 @@ def create_app(args):  # noqa: C901
     api_call = create_api_call(args.logdir, args.model, args.cache_timeout)
     profiler_api_call = create_profiler_api_call(args.logdir)
     inference_api_call = create_model_convert_api_call()
-    fastdeploy_api_call = create_fastdeploy_api_call()
+    fastdeploy_api_call = create_fastdeploy_api_call(args)
     if args.telemetry:
         update_util.PbUpdater(args.product).start()
 

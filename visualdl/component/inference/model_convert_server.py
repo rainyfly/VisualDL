@@ -49,7 +49,7 @@ class ModelConvertApi(object):
         try:
             self.bos_client = BosFileSystem()
             self.bucket_name = os.getenv("BOS_BUCKET_NAME")
-        except Exception:
+        except Exception as e:
             # When BOS_HOST, BOS_AK, BOS_SK, BOS_STS are not set in the environment variables.
             # We use VDL BOS by default
             self.bos_client = BosFileSystem(write_flag=False)
@@ -156,7 +156,6 @@ class ModelConvertApi(object):
         # delete target_path
         shutil.rmtree(target_path)
         result['model'] = model_encoded
-        print(len(model_encoded))
         return result
 
     @result('application/octet-stream')
@@ -173,7 +172,6 @@ class ModelConvertApi(object):
             raise RuntimeError(
                 "The requested model can not be downloaded due to not existing or convertion failed."
             )
-        print(len(data))
         return data
 
     @result()
@@ -238,7 +236,6 @@ class ModelConvertApi(object):
                     model_encoded = base64.b64encode(onnx_model).decode(
                         'utf-8')
         result['model'] = model_encoded
-        print(len(model_encoded))
         return result
 
     @result('application/octet-stream')
@@ -255,7 +252,6 @@ class ModelConvertApi(object):
             raise RuntimeError(
                 "The requested model can not be downloaded due to not existing or convertion failed."
             )
-        print(len(data))
         return data
 
 

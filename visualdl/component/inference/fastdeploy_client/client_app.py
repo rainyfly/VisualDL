@@ -16,34 +16,17 @@ import gradio as gr
 import numpy as np
 
 from .http_client_manager import get_metric_data
+from .http_client_manager import GrpcClientManager
 from .http_client_manager import HttpClientManager
 from .http_client_manager import metrics_table_head
 from .http_client_manager import metrics_table_head_en
-from .visualizer import visualize_detection
-from .visualizer import visualize_face_alignment
-from .visualizer import visualize_face_detection
-from .visualizer import visualize_headpose
-from .visualizer import visualize_keypoint_detection
-from .visualizer import visualize_matting
-from .visualizer import visualize_ocr
-from .visualizer import visualize_segmentation
+from .visualizer import visualize_text_to_image
 
 _http_manager = HttpClientManager()
-
-supported_tasks = {
-    'detection': visualize_detection,
-    'facedet': visualize_face_detection,
-    'keypointdetection': visualize_keypoint_detection,
-    'segmentation': visualize_segmentation,
-    'matting': visualize_matting,
-    'ocr': visualize_ocr,
-    'facealignment': visualize_face_alignment,
-    'headpose': visualize_headpose,
-    'unspecified': lambda x: str(x)
-}
+_grpc_manager = GrpcClientManager()
 
 
-def create_gradio_client_app():  # noqa:C901
+def create_gradio_client_app(args):  # noqa:C901
     css = """
           .gradio-container {
               font-family: 'IBM Plex Sans', sans-serif;
@@ -111,7 +94,7 @@ def create_gradio_client_app():  # noqa:C901
               font-weight: bold;
               font-size: 115%;
           }
-  """
+    """
 
     block = gr.Blocks(css=css)
 
@@ -144,103 +127,53 @@ def create_gradio_client_app():  # noqa:C901
                             show_label=True,
                             max_lines=1,
                             placeholder="localhost",
-                        )
-
-                        server_http_port_text = gr.Textbox(
-                            label="推理服务端口",
-                            show_label=True,
-                            max_lines=1,
-                            placeholder="8000",
-                        )
+                            value=args.request_ip)
+                        with gr.Column():
+                            server_http_port_text = gr.Textbox(
+                                label="推理服务端口",
+                                show_label=True,
+                                max_lines=1,
+                                placeholder="8001",
+                                value=args.request_port)
+                            port_type_text = gr.Radio(
+                                ['http', 'grpc'],
+                                value=args.request_port_type,
+                                label="端口类型")
 
                         server_metric_port_text = gr.Textbox(
                             label="性能服务端口",
                             show_label=True,
                             max_lines=1,
                             placeholder="8002",
-                        )
+                            value=args.request_metric)
                     with gr.Row():
                         model_name_text = gr.Textbox(
                             label="模型名称",
                             show_label=True,
                             max_lines=1,
-                            placeholder="yolov5",
-                        )
+                            placeholder="stable_diffusion",
+                            value="stable_diffusion")
                         model_version_text = gr.Textbox(
                             label="模型版本",
                             show_label=True,
                             max_lines=1,
                             placeholder="1",
-                        )
+                            value="1")
 
             with gr.Box():
-                with gr.Tab("组件形式"):
-                    check_button = gr.Button("获取模型输入输出")
-                    component_format_column = gr.Column(visible=False)
-                    with component_format_column:
-                        task_radio = gr.Radio(
-                            choices=list(supported_tasks.keys()),
-                            value='unspecified',
-                            label='任务类型',
-                            visible=True)
-                        gr.Markdown("根据模型需要，挑选文本框或者图像框进行输入")
-                        with gr.Row():
-                            with gr.Column():
-                                gr.Markdown("模型输入")
-                                input_accordions = []
-                                input_name_texts = []
-                                input_images = []
-                                input_texts = []
-                                for i in range(6):
-                                    accordion = gr.Accordion(
-                                        "输入变量 {}".format(i),
-                                        open=True,
-                                        visible=False)
-                                    with accordion:
-                                        input_name_text = gr.Textbox(
-                                            label="变量名", interactive=False)
-                                        input_image = gr.Image(type='numpy')
-                                        input_text = gr.Textbox(
-                                            label="文本框", max_lines=1000)
-                                    input_accordions.append(accordion)
-                                    input_name_texts.append(input_name_text)
-                                    input_images.append(input_image)
-                                    input_texts.append(input_text)
+                input_column = gr.Column()
+                with input_column:
+                    gr.Markdown("请输入Prompt文本进行描述")
+                    input_text = gr.Textbox(label="文本", max_lines=1000)
 
-                            with gr.Column():
-                                gr.Markdown("模型输出")
-                                output_accordions = []
-                                output_name_texts = []
-                                output_images = []
-                                output_texts = []
-                                for i in range(6):
-                                    accordion = gr.Accordion(
-                                        "输出变量 {}".format(i),
-                                        open=True,
-                                        visible=False)
-                                    with accordion:
-                                        output_name_text = gr.Textbox(
-                                            label="变量名", interactive=False)
-                                        output_text = gr.Textbox(
-                                            label="服务返回的原数据",
-                                            interactive=False,
-                                            show_label=True)
-                                        output_image = gr.Image(
-                                            interactive=False)
-                                    output_accordions.append(accordion)
-                                    output_name_texts.append(output_name_text)
-                                    output_images.append(output_image)
-                                    output_texts.append(output_text)
-                        component_submit_button = gr.Button("提交请求")
-                with gr.Tab("原始形式"):
-                    gr.Markdown("模型输入")
-                    raw_payload_text = gr.Textbox(
-                        label="负载数据", max_lines=10000)
-                    with gr.Column():
-                        gr.Markdown("输出")
-                        output_raw_text = gr.Textbox(
-                            label="服务返回的原始数据", interactive=False)
-                    raw_submit_button = gr.Button("提交请求")
+                output_column = gr.Column(visible=False)
+                with output_column:
+                    gr.Markdown("生成图像")
+                    output_image = gr.Image(interactive=False)
+
+                with gr.Row():
+                    component_submit_button = gr.Button("提交")
+                    reset_button = gr.Button("重置")
 
             with gr.Box():
                 with gr.Column():
@@ -250,7 +183,7 @@ def create_gradio_client_app():  # noqa:C901
                         interactive=False,
                         show_label=False,
                         value=metrics_table_head.format('', ''))
-                    update_metric_button = gr.Button("更新统计数据")
+                    update_metric_button = gr.Button("更新数据")
 
             status_text = gr.Textbox(
                 label="status",
@@ -266,106 +199,66 @@ def create_gradio_client_app():  # noqa:C901
             visible=False
         )  # This text box is only used for divide zh and en page
 
-        all_input_output_components = input_accordions + input_name_texts + input_images + \
-            input_texts + output_accordions + output_name_texts + output_images + output_texts
-
-        def get_input_output_name(server_ip, server_port, model_name,
-                                  model_version, lang_text):
-            try:
-                server_addr = server_ip + ':' + server_port
-                input_metas, output_metas = _http_manager.get_model_meta(
-                    server_addr, model_name, model_version)
-            except Exception as e:
-                return {status_text: str(e)}
-            results = {
-                component: None
-                for component in all_input_output_components
-            }
-            results[component_format_column] = gr.update(visible=True)
-            for input_accordio in input_accordions:
-                results[input_accordio] = gr.update(visible=False)
-            for output_accordio in output_accordions:
-                results[output_accordio] = gr.update(visible=False)
-            results[status_text] = 'Get model inputs and outputs successfully.'
-            for i, input_meta in enumerate(input_metas):
-                results[input_accordions[i]] = gr.update(visible=True)
-                results[input_name_texts[i]] = input_meta['name']
-            for i, output_meta in enumerate(output_metas):
-                results[output_accordions[i]] = gr.update(visible=True)
-                results[output_name_texts[i]] = output_meta['name']
-            return results
+        # input_column
+        # input_text
+        # output_column
+        # output_image
+        # component_submit_button
+        # reset_button
 
         def component_inference(*args):
             server_ip = args[0]
-            http_port = args[1]
-            metric_port = args[2]
-            model_name = args[3]
-            model_version = args[4]
-            names = args[5:5 + len(input_name_texts)]
-            images = args[5 + len(input_name_texts):5 + len(input_name_texts) +
-                          len(input_images)]
-            texts = args[5 + len(input_name_texts) + len(input_images):5 +
-                         len(input_name_texts) + len(input_images) +
-                         len(input_texts)]
-            task_type = args[-1]
-            server_addr = server_ip + ':' + http_port
-            if server_ip and http_port and model_name and model_version:
+            port = args[1]
+            port_type = args[2]
+            metric_port = args[3]
+            model_name = args[4]
+            model_version = args[5]
+
+            input_text_data = args[6]
+
+            server_addr = server_ip + ':' + port
+            if port_type == 'http':
+                manager = _http_manager
+            else:
+                manager = _grpc_manager
+            try:
+                input_metas, output_metas = manager.get_model_meta(
+                    server_addr, model_name, model_version)
+            except Exception as e:
+                return {status_text: str(e)}
+
+            if server_ip and port and model_name and model_version:
                 inputs = {}
-                for i, input_name in enumerate(names):
-                    if input_name:
-                        if images[i] is not None:
-                            inputs[input_name] = np.array([images[i]])
-                        if texts[i]:
-                            inputs[input_name] = np.array(
-                                [[texts[i].encode('utf-8')]], dtype=np.object_)
+                for i, input_meta in enumerate(input_metas):
+                    if input_text_data:
+                        print('input_text_data', input_text_data)
+                        inputs[input_meta.name] = np.array(
+                            [[input_text_data.encode('utf-8')]],
+                            dtype=np.object_)
+                    else:
+                        return {status_text: "请输入Prompt再进行提交"}
                 try:
-                    infer_results = _http_manager.infer(
-                        server_addr, model_name, model_version, inputs)
-                    results = {status_text: 'Inference successfully.'}
+                    infer_results = manager.infer(server_addr, model_name,
+                                                  model_version, inputs)
+                    results = {status_text: '推理成功'}
                     for i, (output_name,
                             data) in enumerate(infer_results.items()):
-                        results[output_name_texts[i]] = output_name
-                        results[output_texts[i]] = str(data)
-                        if task_type != 'unspecified':
-                            try:
-                                results[output_images[i]] = supported_tasks[
-                                    task_type](images[0], data)
-                            except Exception:
-                                results[output_images[i]] = None
+                        try:
+                            results[output_image] = visualize_text_to_image(
+                                data)
+                        except Exception:
+                            results[output_image] = None
+                            return {status_text: "解析模型生成数据发生错误"}
                     if metric_port:
                         html_table = get_metric_data(server_ip, metric_port,
                                                      'zh')
                         results[output_html_table] = html_table
+                    results[output_column] = gr.update(visible=True)
                     return results
                 except Exception as e:
-                    return {status_text: 'Error: {}'.format(e)}
+                    return {status_text: '发生错误: {}'.format(e)}
             else:
-                return {
-                    status_text:
-                    'Please input server addr, model name and model version.'
-                }
-
-        def raw_inference(*args):
-            server_ip = args[0]
-            http_port = args[1]
-            metric_port = args[2]
-            model_name = args[3]
-            model_version = args[4]
-            payload_text = args[5]
-            server_addr = server_ip + ':' + http_port
-            try:
-                result = _http_manager.raw_infer(server_addr, model_name,
-                                                 model_version, payload_text)
-                results = {
-                    status_text: 'Get response from server',
-                    output_raw_text: result
-                }
-                if server_ip and metric_port:
-                    html_table = get_metric_data(server_ip, metric_port, 'zh')
-                    results[output_html_table] = html_table
-                return results
-            except Exception as e:
-                return {status_text: 'Error: {}'.format(e)}
+                return {status_text: '请输入服务地址、端口号等数据再进行尝试'}
 
         def update_metric(server_ip, metrics_port, lang_text):
             if server_ip and metrics_port:
@@ -373,52 +266,46 @@ def create_gradio_client_app():  # noqa:C901
                     html_table = get_metric_data(server_ip, metrics_port, 'zh')
                     return {
                         output_html_table: html_table,
-                        status_text: "Update metrics successfully."
+                        status_text: "成功更新性能数据"
                     }
                 except Exception as e:
                     return {status_text: 'Error: {}'.format(e)}
             else:
-                return {
-                    status_text: 'Please input server ip and metrics_port.'
-                }
+                return {status_text: '请先设置服务ip和端口号port再进行提交'}
 
-        check_button.click(
-            fn=get_input_output_name,
-            inputs=[
-                server_addr_text, server_http_port_text, model_name_text,
-                model_version_text, lang_text
-            ],
-            outputs=[
-                *all_input_output_components, check_button,
-                component_format_column, status_text
-            ])
+        def clear_contents(*args):
+            results = {
+                output_column: gr.update(visible=False),
+                output_image: None,
+                input_text: None
+            }
+            return results
+
         component_submit_button.click(
             fn=component_inference,
             inputs=[
-                server_addr_text, server_http_port_text,
+                server_addr_text, server_http_port_text, port_type_text,
                 server_metric_port_text, model_name_text, model_version_text,
-                *input_name_texts, *input_images, *input_texts, task_radio
+                input_text
             ],
             outputs=[
-                *output_name_texts, *output_images, *output_texts, status_text,
-                output_html_table
+                output_column, output_image, status_text, output_html_table
             ])
-        raw_submit_button.click(
-            fn=raw_inference,
-            inputs=[
-                server_addr_text, server_http_port_text,
-                server_metric_port_text, model_name_text, model_version_text,
-                raw_payload_text
-            ],
-            outputs=[output_raw_text, status_text, output_html_table])
+
+        reset_button.click(
+            fn=clear_contents,
+            inputs=[],
+            outputs=[output_column, output_image, input_text])
+
         update_metric_button.click(
             fn=update_metric,
             inputs=[server_addr_text, server_metric_port_text, lang_text],
             outputs=[output_html_table, status_text])
+
     return block
 
 
-def create_gradio_client_app_en():  # noqa:C901
+def create_gradio_client_app_en(args):  # noqa:C901
     css = """
           .gradio-container {
               font-family: 'IBM Plex Sans', sans-serif;
@@ -519,107 +406,54 @@ def create_gradio_client_app_en():  # noqa:C901
                             show_label=True,
                             max_lines=1,
                             placeholder="localhost",
-                        )
-
-                        server_http_port_text = gr.Textbox(
-                            label="server port",
-                            show_label=True,
-                            max_lines=1,
-                            placeholder="8000",
-                        )
+                            value=args.request_ip)
+                        with gr.Column():
+                            server_http_port_text = gr.Textbox(
+                                label="server port",
+                                show_label=True,
+                                max_lines=1,
+                                placeholder="8001",
+                                value=args.request_port)
+                            port_type_text = gr.Radio(
+                                ['http', 'grpc'],
+                                value=args.request_port_type,
+                                label="port type")
 
                         server_metric_port_text = gr.Textbox(
                             label="metrics port",
                             show_label=True,
                             max_lines=1,
                             placeholder="8002",
-                        )
+                            value=args.request_metric)
                     with gr.Row():
                         model_name_text = gr.Textbox(
                             label="model name",
                             show_label=True,
                             max_lines=1,
-                            placeholder="yolov5",
-                        )
+                            placeholder="stable_diffusion",
+                            value='stable_diffusion')
                         model_version_text = gr.Textbox(
                             label="model version",
                             show_label=True,
                             max_lines=1,
                             placeholder="1",
-                        )
+                            value="1")
 
             with gr.Box():
-                with gr.Tab("Component form"):
-                    check_button = gr.Button("get model input and output")
-                    component_format_column = gr.Column(visible=False)
-                    with component_format_column:
-                        task_radio = gr.Radio(
-                            choices=list(supported_tasks.keys()),
-                            value='unspecified',
-                            label='task type',
-                            visible=True)
-                        gr.Markdown(
-                            "Choose text or image component to input according to data type"
-                        )
-                        with gr.Row():
-                            with gr.Column():
-                                gr.Markdown("Inputs")
-                                input_accordions = []
-                                input_name_texts = []
-                                input_images = []
-                                input_texts = []
-                                for i in range(6):
-                                    accordion = gr.Accordion(
-                                        "variable {}".format(i),
-                                        open=True,
-                                        visible=False)
-                                    with accordion:
-                                        input_name_text = gr.Textbox(
-                                            label="variable name",
-                                            interactive=False)
-                                        input_image = gr.Image(type='numpy')
-                                        input_text = gr.Textbox(
-                                            label="text", max_lines=1000)
-                                    input_accordions.append(accordion)
-                                    input_name_texts.append(input_name_text)
-                                    input_images.append(input_image)
-                                    input_texts.append(input_text)
+                input_column = gr.Column()
+                with input_column:
+                    gr.Markdown(
+                        "Please input prompt text to describe contents")
+                    input_text = gr.Textbox(label="Text", max_lines=1000)
 
-                            with gr.Column():
-                                gr.Markdown("Outputs")
-                                output_accordions = []
-                                output_name_texts = []
-                                output_images = []
-                                output_texts = []
-                                for i in range(6):
-                                    accordion = gr.Accordion(
-                                        "variable {}".format(i),
-                                        open=True,
-                                        visible=False)
-                                    with accordion:
-                                        output_name_text = gr.Textbox(
-                                            label="variable name",
-                                            interactive=False)
-                                        output_text = gr.Textbox(
-                                            label="text",
-                                            interactive=False,
-                                            show_label=True)
-                                        output_image = gr.Image(
-                                            interactive=False)
-                                    output_accordions.append(accordion)
-                                    output_name_texts.append(output_name_text)
-                                    output_images.append(output_image)
-                                    output_texts.append(output_text)
-                        component_submit_button = gr.Button("submit request")
-                with gr.Tab("Original form"):
-                    gr.Markdown("Request")
-                    raw_payload_text = gr.Textbox(
-                        label="request payload", max_lines=10000)
-                    with gr.Column():
-                        gr.Markdown("Response")
-                        output_raw_text = gr.Textbox(
-                            label="raw response data", interactive=False)
-                    raw_submit_button = gr.Button("submit request")
+                output_column = gr.Column(visible=False)
+                with output_column:
+                    gr.Markdown("Generated image")
+                    output_image = gr.Image(interactive=False)
+
+                with gr.Row():
+                    component_submit_button = gr.Button("submit")
+                    reset_button = gr.Button("reset")
 
             with gr.Box():
                 with gr.Column():
@@ -642,111 +476,79 @@ def create_gradio_client_app_en():  # noqa:C901
         lang_text = gr.Textbox(
             label="lang",
             show_label=False,
-            value='en',
+            value='zh',
             max_lines=1,
             visible=False
         )  # This text box is only used for divide zh and en page
 
-        all_input_output_components = input_accordions + input_name_texts + input_images + \
-            input_texts + output_accordions + output_name_texts + output_images + output_texts
-
-        def get_input_output_name(server_ip, server_port, model_name,
-                                  model_version, lang_text):
-            try:
-                server_addr = server_ip + ':' + server_port
-                input_metas, output_metas = _http_manager.get_model_meta(
-                    server_addr, model_name, model_version)
-            except Exception as e:
-                return {status_text: str(e)}
-            results = {
-                component: None
-                for component in all_input_output_components
-            }
-            results[component_format_column] = gr.update(visible=True)
-            for input_accordio in input_accordions:
-                results[input_accordio] = gr.update(visible=False)
-            for output_accordio in output_accordions:
-                results[output_accordio] = gr.update(visible=False)
-            results[status_text] = 'Get model inputs and outputs successfully.'
-            for i, input_meta in enumerate(input_metas):
-                results[input_accordions[i]] = gr.update(visible=True)
-                results[input_name_texts[i]] = input_meta['name']
-            for i, output_meta in enumerate(output_metas):
-                results[output_accordions[i]] = gr.update(visible=True)
-                results[output_name_texts[i]] = output_meta['name']
-            return results
+        # input_column
+        # input_text
+        # output_column
+        # output_image
+        # component_submit_button
+        # reset_button
 
         def component_inference(*args):
             server_ip = args[0]
-            http_port = args[1]
-            metric_port = args[2]
-            model_name = args[3]
-            model_version = args[4]
-            names = args[5:5 + len(input_name_texts)]
-            images = args[5 + len(input_name_texts):5 + len(input_name_texts) +
-                          len(input_images)]
-            texts = args[5 + len(input_name_texts) + len(input_images):5 +
-                         len(input_name_texts) + len(input_images) +
-                         len(input_texts)]
-            task_type = args[-1]
-            server_addr = server_ip + ':' + http_port
-            if server_ip and http_port and model_name and model_version:
+            port = args[1]
+            port_type = args[2]
+            metric_port = args[3]
+            model_name = args[4]
+            model_version = args[5]
+
+            input_text_data = args[6]
+
+            server_addr = server_ip + ':' + port
+            if port_type == 'http':
+                manager = _http_manager
+            else:
+                manager = _grpc_manager
+            try:
+                input_metas, output_metas = manager.get_model_meta(
+                    server_addr, model_name, model_version)
+            except Exception as e:
+                return {status_text: str(e)}
+
+            if server_ip and port and model_name and model_version:
                 inputs = {}
-                for i, input_name in enumerate(names):
-                    if input_name:
-                        if images[i] is not None:
-                            inputs[input_name] = np.array([images[i]])
-                        if texts[i]:
-                            inputs[input_name] = np.array(
-                                [[texts[i].encode('utf-8')]], dtype=np.object_)
+                for i, input_meta in enumerate(input_metas):
+                    if input_text_data:
+                        print('input_text_data', input_text_data)
+                        inputs[input_meta.name] = np.array(
+                            [[input_text_data.encode('utf-8')]],
+                            dtype=np.object_)
+                    else:
+                        return {
+                            status_text:
+                            "Please input prompt text before submit"
+                        }
                 try:
-                    infer_results = _http_manager.infer(
-                        server_addr, model_name, model_version, inputs)
-                    results = {status_text: 'Inference successfully.'}
+                    infer_results = manager.infer(server_addr, model_name,
+                                                  model_version, inputs)
+                    results = {status_text: 'Inference successfully'}
                     for i, (output_name,
                             data) in enumerate(infer_results.items()):
-                        results[output_name_texts[i]] = output_name
-                        results[output_texts[i]] = str(data)
-                        if task_type != 'unspecified':
-                            try:
-                                results[output_images[i]] = supported_tasks[
-                                    task_type](images[0], data)
-                            except Exception:
-                                results[output_images[i]] = None
+                        try:
+                            results[output_image] = visualize_text_to_image(
+                                data)
+                        except Exception:
+                            results[output_image] = None
+                            return {
+                                status_text: "Error to parse returned data"
+                            }
                     if metric_port:
                         html_table = get_metric_data(server_ip, metric_port,
-                                                     'en')
+                                                     'zh')
                         results[output_html_table] = html_table
+                    results[output_column] = gr.update(visible=True)
                     return results
                 except Exception as e:
                     return {status_text: 'Error: {}'.format(e)}
             else:
                 return {
                     status_text:
-                    'Please input server addr, model name and model version.'
+                    'Please input server ip, port first before submit'
                 }
-
-        def raw_inference(*args):
-            server_ip = args[0]
-            http_port = args[1]
-            metric_port = args[2]
-            model_name = args[3]
-            model_version = args[4]
-            payload_text = args[5]
-            server_addr = server_ip + ':' + http_port
-            try:
-                result = _http_manager.raw_infer(server_addr, model_name,
-                                                 model_version, payload_text)
-                results = {
-                    status_text: 'Get response from server',
-                    output_raw_text: result
-                }
-                if server_ip and metric_port:
-                    html_table = get_metric_data(server_ip, metric_port, 'en')
-                    results[output_html_table] = html_table
-                return results
-            except Exception as e:
-                return {status_text: 'Error: {}'.format(e)}
 
         def update_metric(server_ip, metrics_port, lang_text):
             if server_ip and metrics_port:
@@ -763,37 +565,33 @@ def create_gradio_client_app_en():  # noqa:C901
                     status_text: 'Please input server ip and metrics_port.'
                 }
 
-        check_button.click(
-            fn=get_input_output_name,
-            inputs=[
-                server_addr_text, server_http_port_text, model_name_text,
-                model_version_text, lang_text
-            ],
-            outputs=[
-                *all_input_output_components, check_button,
-                component_format_column, status_text
-            ])
+        def clear_contents(*args):
+            results = {
+                output_column: gr.update(visible=False),
+                output_image: None,
+                input_text: None
+            }
+            return results
+
         component_submit_button.click(
             fn=component_inference,
             inputs=[
-                server_addr_text, server_http_port_text,
+                server_addr_text, server_http_port_text, port_type_text,
                 server_metric_port_text, model_name_text, model_version_text,
-                *input_name_texts, *input_images, *input_texts, task_radio
+                input_text
             ],
             outputs=[
-                *output_name_texts, *output_images, *output_texts, status_text,
-                output_html_table
+                output_column, output_image, status_text, output_html_table
             ])
-        raw_submit_button.click(
-            fn=raw_inference,
-            inputs=[
-                server_addr_text, server_http_port_text,
-                server_metric_port_text, model_name_text, model_version_text,
-                raw_payload_text
-            ],
-            outputs=[output_raw_text, status_text, output_html_table])
+
+        reset_button.click(
+            fn=clear_contents,
+            inputs=[],
+            outputs=[output_column, output_image, input_text])
+
         update_metric_button.click(
             fn=update_metric,
             inputs=[server_addr_text, server_metric_port_text, lang_text],
             outputs=[output_html_table, status_text])
-    return block
+
+        return block

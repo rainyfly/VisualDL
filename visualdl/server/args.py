@@ -46,6 +46,10 @@ class DefaultArgs(object):
         self.dest = args.get('dest', '')
         self.behavior = args.get('behavior', '')
         self.component_tabs = args.get('component_tabs', None)
+        self.request_ip = args.get('request_ip', 'localhost')
+        self.request_port = args.get('request_port', '8001')
+        self.request_port_type = args.get('request_port_type', 'grpc')
+        self.request_metric = args.get('request_metric', '8002')
 
 
 def get_host(host=default_host, port=default_port):
@@ -129,6 +133,10 @@ class ParseArgs(object):
         self.dest = args.dest
         self.behavior = args.behavior
         self.component_tabs = args.component_tabs
+        self.request_ip = args.request_ip
+        self.request_port = args.request_port
+        self.request_port_type = args.request_port_type
+        self.request_metric = args.request_metric
 
 
 def parse_args():
@@ -227,6 +235,31 @@ def parse_args():
         default=None,
         choices=support_themes,
         help="set theme")
+
+    parser.add_argument(
+        "--request_ip",
+        type=str,
+        default="localhost",
+        help="request server ip in fastdeploy client")
+
+    parser.add_argument(
+        "--request_port",
+        type=str,
+        default="8001",
+        help="request port in fastdeploy client")
+
+    parser.add_argument(
+        "--request_port_type",
+        type=str,
+        default="grpc",
+        help="request port type in fastdeploy client")
+
+    parser.add_argument(
+        "--request_metric",
+        type=str,
+        default="8002",
+        help="request metric port in fastdeploy client")
+
     parser.add_argument('dest', nargs='?', help='set destination for log')
     parser.add_argument("behavior", nargs='?')
 

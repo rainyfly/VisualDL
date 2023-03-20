@@ -27,8 +27,8 @@ import google.protobuf.json_format as json_format
 import google.protobuf.text_format as text_format
 import psutil
 import requests
+from tritonclient.grpc.model_config_pb2 import ModelConfig
 
-from .proto.model_config_pb2 import ModelConfig
 from visualdl.utils.dir import FASTDEPLOYSERVER_PATH
 
 
